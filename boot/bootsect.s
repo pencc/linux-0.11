@@ -86,7 +86,7 @@ go:	mov	ax,cs			! 将ds、es和ss都置成移动后代码所在的段处（0x900
 
 ! 利用BIOS中断0x13将setup模块从磁盘第二个扇区开始读到0x90200开始处
 ! 共读4个扇区。如果读出错，则复位驱动器，并重试，没有退路。
-! INT 0x13读扇区使用方法如下：
+! INT 0x13 读扇区使用方法如下：
 ! ah = 0x02读磁盘扇区到内存； al = 需要读出的扇区数量
 ! ch = 磁道（柱面）号的低8位； cl = 开始扇区（位0-5），磁道号高两位（位6-7）
 ! dh = 磁头号； dl = 驱动器号（如果是硬盘则位7要置位）
@@ -123,7 +123,7 @@ ok_load_setup:
 ! 由于本程序代码和数据都被设置在一个段中，即段寄存器cs和ds、es值相同，所以可以不使用该指令
 	seg cs
 ! 下句保存每磁道扇区数，对于软盘来说最大磁道号不超过256，ch已经足够表示它了，
-! 因此cl的位6-7肯定为0，之前设置ch=0，因此cx中是每磁道扇区数
+! 因此cl的位6-7肯定为0，之前设置ch=0，因此cx中是每磁道扇区数。
 	mov	sectors,cx		！把磁盘扇区数放到位置0x00的地方 ？
 	mov	ax,#INITSEG
 	mov	es,ax			！因为上面取磁盘参数中断改掉了es的值，这里重新改回 ？
@@ -135,7 +135,7 @@ ok_load_setup:
 
 ! BIOS中断0x10功能号ah=0x13，显示字符串。
 ! 输入：al = 放置光标的方式及规定属性。0x01-表示使用bl中的属性值，光标停在字符串结尾处。
-! es:bp此寄存器对指向要显示的字符串起始位置处。cx=显示字符串字符数。bh=显示页面号
+! es:bp此寄存器对指向要显示的字符串起始位置处。cx=显示字符串字符数。bh=显示页面号。
 ! bl = 字符属性。 dh=行号。dl=列号。
 
 	mov	ah,#0x03		! read cursor pos
@@ -160,28 +160,39 @@ ok_load_setup:
 ! defined (!= 0), nothing is done and the given device is used.
 ! Otherwise, either /dev/PS0 (2,28) or /dev/at0 (2,8), depending
 ! on the number of sectors that the BIOS reports currently.
+!! 上面一行中两个设备文件的含义:
+!! 在Linux中软驱的主设备号是2, 次设备号 = type*4 + nr，其中nr为0-3分别
+!! 对应软驱A、B、C或D; type是软驱的类型（2->1.2MB或7->1.44MB等）。
+!! 因为7*4 + 0 = 28，所以/dev/PS0（2,28）指的是1.44MB A驱动器，其设备号为0x021c
+!! 同理/dev/at0（2,8）指的是1.2MB A驱动器，其设备号为0x0208。
+! 下面root_dev定义在引导扇区508,509字节处，指根文件系统所在设备号。0x306指第2个
+! 硬盘第1个分区。
 
 	seg cs
-	mov	ax,root_dev
+	mov	ax,root_dev		! 取508,509字节处的根设备号并判断是否已被定义。
 	cmp	ax,#0
 	jne	root_defined
+! 取上面保存的每磁道扇区数。如果sectors=15则说明是1.2MB的驱动器，如果
+! sectors=18，则说明是1.44MB软驱。因为是可引导的驱动器，所以肯定是A驱。
 	seg cs
 	mov	bx,sectors
 	mov	ax,#0x0208		! /dev/ps0 - 1.2Mb
-	cmp	bx,#15
-	je	root_defined
+	cmp	bx,#15			! 判断每磁道扇区数是否=15
+	je	root_defined	! 如果等于，则ax中就是引导驱动器的设备号
 	mov	ax,#0x021c		! /dev/PS0 - 1.44Mb
 	cmp	bx,#18
 	je	root_defined
-undef_root:
+undef_root:				! 如果都不一样，则死循环
 	jmp undef_root
 root_defined:
 	seg cs
-	mov	root_dev,ax
+	mov	root_dev,ax		! 将检查过的设备号保存到root_dev中。
 
 ! after that (everyting loaded), we jump to
 ! the setup-routine loaded directly after
 ! the bootblock:
+! 到此，所有程序都加载完毕，我们就跳转到被加载在bootsect后面的setup程序去。 
+! 段间跳转指令。跳转到0x9020:0000（setup.s程序开始处）去执行。
 
 	jmpi	0,SETUPSEG
 
