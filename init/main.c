@@ -26,7 +26,7 @@
  * won't be any messing with the stack from main(), but we define
  * some others too.
  */
-// Linux在内核空间创建进程时不使用写时复制技术(Copy on write).main()在移动到用户
+// Linux在内核空间创建进程将导致没有写时复制(Copy on write).main()在移动到用户
 // 模式（到任务0）后执行内嵌方式的fork()和pause(),因此可保证不适用任务0的用户栈。
 // 在执行moveto_user_mode()之后，本程序main()就以任务0的身份在运行了。而任务0是
 // 所有将将创建子进程的父进程。当它创建ygie子进程时(init进程)，由于任务1代码属于
