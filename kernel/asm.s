@@ -26,7 +26,7 @@
 # traps.c中实现。
 divide_error:
 	pushl $do_divide_error      # 首先把将要调用的函数地址入栈
-no_error_code:                  # 这里是五出错号处理的入口处。
+no_error_code:                  # 这里是无出错号处理的入口处。
 	xchgl %eax,(%esp)           # _do_divide_error的地址→eax,eax被交换入栈
 	pushl %ebx
 	pushl %ecx

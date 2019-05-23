@@ -126,7 +126,7 @@ system_call:
 # 以下这段代码执行从系统调用C函数返回后，对信号进行识别处理。其他中断服务程序退出时也
 # 将跳转到这里进行处理后才退出中断过程，例如后面的处理器出错中断int 16.
 ret_from_sys_call:
-# 首先判别当前任务是否是初始任务task0,如果是则不比对其进行信号量方面的处理，直接返回。
+# 首先判别当前任务是否是初始任务task0,如果是则不对其进行信号量方面的处理，直接返回。
 	movl current,%eax		# task[0] cannot have signals
 	cmpl task,%eax
 	je 3f                   # 向前(forward)跳转到标号3处退出中断处理
@@ -237,7 +237,7 @@ timer_interrupt:
 	pushl %ecx		# save those across function calls. %ebx
 	pushl %ebx		# is saved as we use that in ret_sys_call
 	pushl %eax
-	movl $0x10,%eax
+	movl $0x10,%eax # ds,es设置为指向内核数据段
 	mov %ax,%ds
 	mov %ax,%es
 	movl $0x17,%eax
@@ -246,7 +246,7 @@ timer_interrupt:
 # 由于初始化中断控制芯片时没有采用自动EOI，所以这里需要发指令结束该硬件中断。
 	movb $0x20,%al		# EOI to interrupt controller #1
 	outb %al,$0x20      # 操作命令字OCW2送0x20端口
-# 下面从堆栈镇南关取出执行系统调用代码的选择符(CS段寄存器值)中的当前特权级别(0或3)
+# 下面从堆栈中取出执行系统调用代码的选择符(CS段寄存器值)中的当前特权级别(0或3)
 # 并压入堆栈，作为do_timer的参数。do_timer函数执行任务切换、计时等工作。
 	movl CS(%esp),%eax
 	andl $3,%eax		# %eax is CPL (0 or 3, 0=supervisor)
