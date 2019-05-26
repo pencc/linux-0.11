@@ -1,7 +1,7 @@
 #ifndef _BLK_H
 #define _BLK_H
 
-#define NR_BLK_DEV	7
+#define NR_BLK_DEV	7		// 块设备数量
 /*
  * NR_REQUEST is the number of entries in the request-queue.
  * NOTE that writes may use only the low 2/3 of these: reads
@@ -21,36 +21,42 @@
  * read/write completion.
  */
 struct request {
-	int dev;		/* -1 if no request */
-	int cmd;		/* READ or WRITE */
-	int errors;
-	unsigned long sector;
-	unsigned long nr_sectors;
-	char * buffer;
-	struct task_struct * waiting;
-	struct buffer_head * bh;
-	struct request * next;
+	int dev;		/* -1 if no request */	// 发请求的设备号
+	int cmd;		/* READ or WRITE */		// READ或WRITE命令
+	int errors;								// 操作时引起的错误次数
+	unsigned long sector;					// 起始扇区(1块=2扇区)
+	unsigned long nr_sectors;				// 读/写扇区数
+	char * buffer;							// 数据缓冲区
+	struct task_struct * waiting;			// 任务等待操作执行完成的地方
+	struct buffer_head * bh;				// 缓冲区头指针
+	struct request * next;					// 指向下一请求项
 };
 
 /*
- * This is used in the elevator algorithm: Note that
+ * This is used in the elevator algorithm(电梯算法): Note that
  * reads always go before writes. This is natural: reads
- * are much more time-critical than writes.
+ * are much more time-critical(时间要求严格) than writes.
  */
+// 下面宏判断两个请求项结构的前后排列顺序。这个顺序将用作访问块设备时的请求
+// 项执行顺序。这个宏会在程序ll_rw_blk.c中的函数add_request()中被调用。
+// 该宏部分地实现了I/O调度功能，即实现了对请求项的排序功能(另一个是请求项合并功能)。
 #define IN_ORDER(s1,s2) \
 ((s1)->cmd<(s2)->cmd || ((s1)->cmd==(s2)->cmd && \
 ((s1)->dev < (s2)->dev || ((s1)->dev == (s2)->dev && \
 (s1)->sector < (s2)->sector))))
 
+// 块设备结构
 struct blk_dev_struct {
-	void (*request_fn)(void);
-	struct request * current_request;
+	void (*request_fn)(void);			// 请求操作的函数指针
+	struct request * current_request;	// 当前正在处理的请求信息结构
 };
 
-extern struct blk_dev_struct blk_dev[NR_BLK_DEV];
-extern struct request request[NR_REQUEST];
-extern struct task_struct * wait_for_request;
+extern struct blk_dev_struct blk_dev[NR_BLK_DEV];	// 块设备表(数组)，每种块设备占用一项
+extern struct request request[NR_REQUEST];			// 请求项队列数组
+extern struct task_struct * wait_for_request;		// 等待空闲请求项的进程队列头指针
 
+// 在块设备驱动程序(如hd.c)包含此头文件时，必须先定义驱动程序处理设备的主设备号
+// 这样下面就能为包含本文件的驱动程序给出正确的宏定义。
 #ifdef MAJOR_NR
 
 /*

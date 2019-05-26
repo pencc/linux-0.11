@@ -270,9 +270,9 @@ sys_execve:
 .align 2
 sys_fork:
 	call find_empty_process
-	testl %eax,%eax             # 在eax中返回进程号pid。若返回负数则退出。
+	testl %eax,%eax             # 在eax中返回可用task空间索引号，返回-EAGAIN为失败。
 	js 1f
-	push %gs
+	push %gs					# 将如下寄存器中的值压入栈作为copy_process的参数
 	pushl %esi
 	pushl %edi
 	pushl %ebp
@@ -294,15 +294,15 @@ hd_interrupt:
 	push %ds
 	push %es
 	push %fs
-	movl $0x10,%eax
+	movl $0x10,%eax		# ds,es置为内核数据段
 	mov %ax,%ds
 	mov %ax,%es
-	movl $0x17,%eax
+	movl $0x17,%eax		# fs置为调用程序的局部数据段
 	mov %ax,%fs
 # 由于初始化中断控制芯片时没有采用自动EOI，所以这里需要发指令结束该硬件中断。
 	movb $0x20,%al
-	outb %al,$0xA0		# EOI to interrupt controller #1
-	jmp 1f			# give port chance to breathe
+	outb %al,$0xA0		# EOI to interrupt controller #1  送从8259A
+	jmp 1f			# give port chance to breathe	jmp起延时作用
 1:	jmp 1f
 # do_hd定义为一个函数指针，将被赋值read_intr()或write_intr()函数地址。放到edx
 # 寄存器后就将do_hd指针变量置为NULL。然后测试得到的函数指针，若该指针为空，则

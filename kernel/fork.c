@@ -140,8 +140,8 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	p->signal = 0;                  // 信号位图置0
 	p->alarm = 0;                   // 报警定时值(滴答数)
 	p->leader = 0;		/* process leadership doesn't inherit */
-	p->utime = p->stime = 0;        // 用户态时间和和心态运行时间
-	p->cutime = p->cstime = 0;      // 子进程用户态和和心态运行时间
+	p->utime = p->stime = 0;        // 用户态时间和内核态运行时间
+	p->cutime = p->cstime = 0;      // 子进程用户态和内核态运行时间
 	p->start_time = jiffies;        // 进程开始运行时间(当前时间滴答数)
     // 再修改任务状态段TSS数据，由于系统给任务结构p分配了1页新内存，所以(PAGE_SIZE+
     // (long)p)让esp0正好指向该页顶端。ss0:esp0用作程序在内核态执行时的栈。另外，
@@ -153,7 +153,7 @@ int copy_process(int nr,long ebp,long edi,long esi,long gs,long none,
 	p->tss.ss0 = 0x10;                      // 内核态栈的段选择符(与内核数据段相同)
 	p->tss.eip = eip;                       // 指令代码指针
 	p->tss.eflags = eflags;                 // 标志寄存器
-	p->tss.eax = 0;                         // 这是当fork()返回时新进程会返回0的原因所在
+	p->tss.eax = 0;                         // 这是当fork()返回时新进程会返回0的原因所在,系统调用返回值存储在eax中
 	p->tss.ecx = ecx;
 	p->tss.edx = edx;
 	p->tss.ebx = ebx;

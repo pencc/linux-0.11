@@ -459,12 +459,12 @@ void do_timer(long cpl)
 
     // 如果有定时器存在，则将链表第1个定时器的值减1.如果已等于0，则调用相应的
     // 处理程序，并将该处理程序指针置空。然后去掉该项定时器。next_timer是定时器
-    // 链表的头指针。
+    // 链表的头指针。  
+	//TODO 为什么这里只处理第一个timer？
 	if (next_timer) {
 		next_timer->jiffies--;
 		while (next_timer && next_timer->jiffies <= 0) {
 			void (*fn)(void);       // 这里插入了一个函数指针定义!!!! o(︶︿︶)o 
-			
 			fn = next_timer->fn;
 			next_timer->fn = NULL;
 			next_timer = next_timer->next;

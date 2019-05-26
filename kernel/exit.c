@@ -49,7 +49,7 @@ static inline int send_sig(long sig,struct task_struct * p,int priv)
 	if (!p || sig<1 || sig>32)
 		return -EINVAL;
     // 如果强制发送标志置位，或者当前进程的有效用户标识符(euid)就是指定进程的euid（也
-    // 即是自己），或者当前进程是超级用婚，则向进程p发送信号sig，即在进程p位图中添加该
+    // 即是自己），或者当前进程是超级用户，则向进程p发送信号sig，即在进程p位图中添加该
     // 信号，否则出错退出。其中suser()定义为(current->euid==0)，用于判断是否是超级用户。
 	if (priv || (current->euid==p->euid) || suser())
 		p->signal |= (1<<(sig-1));
