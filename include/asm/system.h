@@ -14,7 +14,7 @@ __asm__ ("movl %%esp,%%eax\n\t" \
 	:::"ax")
 
 #define sti() __asm__ ("sti"::)
-#define cli() __asm__ ("cli"::)
+#define cli() __asm__ ("cli"::)		// 这里的cli只会修改CPSR(即当前进程状态寄存器)，因此不会影响其它进程接收中断
 #define nop() __asm__ ("nop"::)
 
 #define iret() __asm__ ("iret"::)

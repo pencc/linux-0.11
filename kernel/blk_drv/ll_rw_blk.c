@@ -21,14 +21,16 @@
 struct request request[NR_REQUEST];
 
 /*
- * used to wait on when there are no free requests
+ * 用于在请求数组没有空闲项时进程的临时等待处
  */
 struct task_struct * wait_for_request = NULL;
 
 /* blk_dev_struct is:
- *	do_request-address
- *	next-request
+ *	request_fn			// 对应主设备号的请求处理指针
+ *	current_request		// 当前正在处理的请求（链表结构体，成员中包含了该设备的下一个请求指针）
  */
+// 块设备数组。该数组使用主设备号作为索引。实际内容将在各块设备驱动程序初始化时填入
+// 比如，硬盘驱动程序初始化时候就设置了blk_dev[3].request_fn = DEVICE_REQUEST;
 struct blk_dev_struct blk_dev[NR_BLK_DEV] = {
 	{ NULL, NULL },		/* no_dev */
 	{ NULL, NULL },		/* dev mem */
@@ -36,59 +38,65 @@ struct blk_dev_struct blk_dev[NR_BLK_DEV] = {
 	{ NULL, NULL },		/* dev hd */
 	{ NULL, NULL },		/* dev ttyx */
 	{ NULL, NULL },		/* dev tty */
-	{ NULL, NULL }		/* dev lp */
+	{ NULL, NULL }		/* dev lp */	// lp打印设备
 };
 
+// 锁定指定缓冲块
+// 如果指定的缓冲块已经被其它任务锁定，则使自己睡眠（不可中断的等待），直到
+// 被执行解锁缓冲块的任务明确地唤醒
 static inline void lock_buffer(struct buffer_head * bh)
 {
-	cli();
-	while (bh->b_lock)
+	cli();						// 关中断
+	while (bh->b_lock)			// 如果缓冲区已被锁定则睡眠
 		sleep_on(&bh->b_wait);
-	bh->b_lock=1;
-	sti();
+	bh->b_lock=1;				// 立刻锁定该缓冲区
+	sti();						// 开中断
 }
 
+// 解锁锁定的缓冲区
 static inline void unlock_buffer(struct buffer_head * bh)
 {
 	if (!bh->b_lock)
 		printk("ll_rw_block.c: buffer not locked\n\r");
-	bh->b_lock = 0;
-	wake_up(&bh->b_wait);
+	bh->b_lock = 0;			// 清除锁定标志
+	wake_up(&bh->b_wait);	// 唤醒等待该缓冲区的任务
 }
 
 /*
  * add-request adds a request to the linked list.
  * It disables interrupts so that it can muck with the
- * request-lists in peace.
+ * request-lists in peace.安全的处理请求链表
  */
+// dev是指定块设备结构指针，该结构中有处理请求项函数指针和当前正在请求项指针
 static void add_request(struct blk_dev_struct * dev, struct request * req)
 {
 	struct request * tmp;
 
 	req->next = NULL;
-	cli();
+	cli();								// 关中断
 	if (req->bh)
-		req->bh->b_dirt = 0;
-	if (!(tmp = dev->current_request)) {
+		req->bh->b_dirt = 0;			// 清缓冲区“脏”标志
+	if (!(tmp = dev->current_request)) {// dev当前请求项链表为空，表示目前该设备没有请求项
 		dev->current_request = req;
-		sti();
-		(dev->request_fn)();
+		sti();							// 开中断
+		(dev->request_fn)();			// 执行请求函数，对于硬盘是do_hd_request()
 		return;
 	}
-	for ( ; tmp->next ; tmp=tmp->next)
+	for ( ; tmp->next ; tmp=tmp->next)	// 电梯算法搜索最佳插入位置
 		if ((IN_ORDER(tmp,req) || 
 		    !IN_ORDER(tmp,tmp->next)) &&
 		    IN_ORDER(req,tmp->next))
 			break;
 	req->next=tmp->next;
-	tmp->next=req;
-	sti();
+	tmp->next=req;						// 加入设备链表
+	sti();								// 开中断
 }
 
+// 创建请求项并插入请求队列中
 static void make_request(int major,int rw, struct buffer_head * bh)
 {
 	struct request * req;
-	int rw_ahead;
+	int rw_ahead;			// 逻辑值用于判断是否为READA或者WRITEA命令
 
 /* WRITEA/READA is special case - it is not really needed, so if the */
 /* buffer is locked, we just forget about it, else it's a normal read */
